@@ -1,177 +1,147 @@
+import { FC, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
-import { useState, useMemo, useCallback } from 'react';
-import { Participants } from './Participants';
-import { Question } from './Question';
-import { Wheel } from './Wheel';
-import { Timer } from './Timer';
-import { Header } from './Header';
-import './App.css';
+import { Button, colors } from './styles';
 
-const Main = styled.main`
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 2rem;
-  padding: 2rem 1rem;
-  flex-wrap: wrap;
-
-  @media (max-width: 900px) {
-    flex-direction: column;
-    align-items: center;
-  }
-`;
-
-const SideColumn = styled.div`
+const TimerCard = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 1.5rem;
-  padding-top: 1rem;
-  min-width: 300px;
-  max-width: 360px;
-
-  @media (max-width: 900px) {
-    padding-top: 0;
-    max-width: 100%;
-    align-items: center;
-  }
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 1rem 1.5rem;
+  background-color: #ffffff;
+  border: 2px solid ${colors.lavendelgrau};
+  border-radius: 12px;
+  min-width: 260px;
 `;
 
-const ParticipantsWrapper = styled.div`
-  display: flex;
-  justify-content: center;
-  padding: 1rem;
+const TimeDisplay = styled.span<{ $warning: boolean; $done: boolean }>`
+  font-size: 2.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: ${({ $warning, $done }) =>
+    $warning || $done ? colors.kirsche : colors.kosmischesBlau};
 `;
 
-export const MAX_PARTICIPANTS = 18;
-const TIMER_DURATION_SECONDS = 180; // 3 Minuten
+const ProgressTrack = styled.div`
+  width: 100%;
+  height: 8px;
+  background-color: ${colors.lavendelgrau};
+  border-radius: 999px;
+  overflow: hidden;
+`;
 
-function App() {
-  const [names, setNames] = useState<string[]>([]);
-  const [drawn, setDrawn] = useState<string[]>([]);
-  const [removeOnSpin, setRemoveOnSpin] = useState(true);
+const ProgressFill = styled.div<{ $ratio: number; $warning: boolean }>`
+  height: 100%;
+  width: ${({ $ratio }) => Math.max(0, Math.min(1, $ratio)) * 100}%;
+  background-color: ${({ $warning }) =>
+    $warning ? colors.kirsche : colors.minze};
+  border-radius: 999px;
+  transition:
+    width 300ms linear,
+    background-color 300ms ease;
+`;
 
-  const [timerEnabled, setTimerEnabled] = useState(true);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [timerResetKey, setTimerResetKey] = useState(0);
+const StatusText = styled.p`
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: ${colors.kosmischesBlau};
+`;
 
-  // Verbleibende Namen: alle Namen abzüglich der bereits gezogenen
-  // (duplikatsicher, da jeder gezogene Eintrag nur einmal abgezogen wird)
-  const remaining = useMemo(() => {
-    const pool = [...drawn];
-    return names.filter((name) => {
-      const hit = pool.indexOf(name);
-      if (hit >= 0) {
-        pool.splice(hit, 1);
-        return false;
-      }
-      return true;
-    });
-  }, [names, drawn]);
+const SmallButton = styled(Button)`
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+  margin: 0 0.2rem;
+`;
 
-  const handleAddName = (name: string) => {
-    if (names.length < MAX_PARTICIPANTS) {
-      setNames([...names, name]);
-    }
-  };
+const formatTime = (totalSeconds: number) => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
-  const handleRemoveName = (index: number) => {
-    setNames(names.filter((_, i) => i !== index));
-  };
-
-  const shuffleNames = () => {
-    setNames([...names].sort(() => Math.random() - 0.5));
-  };
-
-  const sortNames = () => {
-    setNames([...names].sort((a, b) => a.localeCompare(b, 'de')));
-  };
-
-  const handleWinnerSelected = (index: number) => {
-    if (!removeOnSpin) return;
-    const winner = remaining[index];
-    if (winner !== undefined) {
-      setDrawn((prev) => [...prev, winner]);
-    }
-  };
-
-  const toggleRemoveOnSpin = () => {
-    setRemoveOnSpin((value) => !value);
-  };
-
-  const resetRound = () => {
-    setDrawn([]);
-  };
-
-  /** Beim Drehen laufende Zeit abbrechen und zurücksetzen. */
-  const handleSpinStart = useCallback(() => {
-    setTimerRunning(false);
-    setTimerResetKey((key) => key + 1);
-  }, []);
-
-  /** Wird aufgerufen, sobald die Meldung „Du bist dran!“ verschwindet. */
-  const handleAnnouncementFinished = useCallback(() => {
-    setTimerEnabled((enabled) => {
-      if (enabled) {
-        setTimerResetKey((key) => key + 1);
-        setTimerRunning(true);
-      }
-      return enabled;
-    });
-  }, []);
-
-  const toggleTimerEnabled = () => {
-    setTimerEnabled((enabled) => {
-      if (enabled) {
-        setTimerRunning(false);
-      }
-      return !enabled;
-    });
-  };
-
-  const handleTimerRunningChange = useCallback((running: boolean) => {
-    setTimerRunning(running);
-  }, []);
-
-  return (
-    <>
-      <Header />
-      <Main>
-        <SideColumn>
-          <Question />
-          {timerEnabled && (
-            <Timer
-              durationSeconds={TIMER_DURATION_SECONDS}
-              running={timerRunning}
-              resetKey={timerResetKey}
-              onRunningChange={handleTimerRunningChange}
-            />
-          )}
-        </SideColumn>
-        <Wheel
-          participants={remaining}
-          onWinnerSelected={handleWinnerSelected}
-          removeOnSpin={removeOnSpin}
-          onToggleRemoveOnSpin={toggleRemoveOnSpin}
-          timerEnabled={timerEnabled}
-          onToggleTimerEnabled={toggleTimerEnabled}
-          onSpinStart={handleSpinStart}
-          onAnnouncementFinished={handleAnnouncementFinished}
-          onResetRound={resetRound}
-          allDone={remaining.length === 0 && names.length > 0}
-        />
-      </Main>
-      <ParticipantsWrapper>
-        <Participants
-          handleAddName={handleAddName}
-          handleRemoveName={handleRemoveName}
-          shuffleNames={shuffleNames}
-          sortNames={sortNames}
-          names={names}
-        />
-      </ParticipantsWrapper>
-    </>
-  );
+interface TimerProps {
+  durationSeconds: number;
+  running: boolean;
+  /** Änderung dieses Werts setzt den Timer zurück. */
+  resetKey: number;
+  onRunningChange: (running: boolean) => void;
 }
 
-export default App;
+export const Timer: FC<TimerProps> = ({
+  durationSeconds,
+  running,
+  resetKey,
+  onRunningChange,
+}) => {
+  const [remaining, setRemaining] = useState(durationSeconds);
+  const intervalRef = useRef<number | undefined>(undefined);
+
+  // Zurücksetzen, sobald eine neue Runde beginnt
+  useEffect(() => {
+    setRemaining(durationSeconds);
+  }, [resetKey, durationSeconds]);
+
+  useEffect(() => {
+    if (!running) return;
+
+    intervalRef.current = window.setInterval(() => {
+      setRemaining((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(intervalRef.current);
+          onRunningChange(false);
+          return 0;
+        }
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalRef.current);
+  }, [running, onRunningChange]);
+
+  const isDone = remaining === 0;
+  const isWarning = !isDone && remaining <= 30;
+  const ratio = durationSeconds === 0 ? 0 : remaining / durationSeconds;
+
+  const statusText = isDone
+    ? 'Zeit ist um'
+    : running
+      ? 'Läuft'
+      : remaining === durationSeconds
+        ? 'Bereit'
+        : 'Pausiert';
+
+  return (
+    <TimerCard>
+      <TimeDisplay $warning={isWarning} $done={isDone} aria-live="polite">
+        {formatTime(remaining)}
+      </TimeDisplay>
+
+      <ProgressTrack>
+        <ProgressFill $ratio={ratio} $warning={isWarning || isDone} />
+      </ProgressTrack>
+
+      <StatusText>{statusText}</StatusText>
+
+      <div>
+        <SmallButton
+          onClick={() => onRunningChange(!running)}
+          disabled={isDone}
+        >
+          {running ? 'Pause' : 'Weiter'}
+        </SmallButton>
+        <SmallButton
+          onClick={() => {
+            onRunningChange(false);
+            setRemaining(durationSeconds);
+          }}
+        >
+          Zurücksetzen
+        </SmallButton>
+      </div>
+    </TimerCard>
+  );
+};
