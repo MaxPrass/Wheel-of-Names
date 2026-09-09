@@ -1,10 +1,9 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import styled from 'styled-components';
 
 import { capitalize } from './utils';
 import { Button, Checkbox, CheckboxLabel, colors } from './styles';
-import { Timer } from './Timer';
 
 const Popup = styled.div`
   position: fixed;
@@ -37,7 +36,6 @@ const WheelContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem;
 `;
 
 const ButtonsContainer = styled.div`
@@ -75,6 +73,10 @@ interface Props {
   onWinnerSelected: (index: number) => void;
   removeOnSpin: boolean;
   onToggleRemoveOnSpin: () => void;
+  timerEnabled: boolean;
+  onToggleTimerEnabled: () => void;
+  onSpinStart: () => void;
+  onAnnouncementFinished: () => void;
   onResetRound: () => void;
   allDone: boolean;
 }
@@ -154,7 +156,7 @@ const buildSectorColors = (count: number) => {
   return result;
 };
 
-/* ---------- Geometrie & Timer ---------- */
+/* ---------- Geometrie ---------- */
 
 const CANVAS_WIDTH = 460;
 const CANVAS_HEIGHT = 420;
@@ -162,7 +164,6 @@ const CENTER_X = 205;
 const CENTER_Y = CANVAS_HEIGHT / 2;
 const RADIUS = 196;
 
-const TIMER_DURATION_SECONDS = 180; // 3 Minuten
 const POPUP_VISIBLE_MS = 5000;
 
 export const Wheel: React.FC<Props> = ({
@@ -170,6 +171,10 @@ export const Wheel: React.FC<Props> = ({
   onWinnerSelected,
   removeOnSpin,
   onToggleRemoveOnSpin,
+  timerEnabled,
+  onToggleTimerEnabled,
+  onSpinStart,
+  onAnnouncementFinished,
   onResetRound,
   allDone,
 }) => {
@@ -180,10 +185,6 @@ export const Wheel: React.FC<Props> = ({
   >('clockwise');
   const [showPopup, setShowPopup] = useState(false);
   const [popupWinner, setPopupWinner] = useState<string | null>(null);
-
-  const [timerEnabled, setTimerEnabled] = useState(true);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [timerResetKey, setTimerResetKey] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const numSectors = participants.length;
@@ -299,8 +300,7 @@ export const Wheel: React.FC<Props> = ({
     if (spinning || numSectors === 0) return;
 
     // Laufenden Timer abbrechen und zurücksetzen
-    setTimerRunning(false);
-    setTimerResetKey((key) => key + 1);
+    onSpinStart();
 
     setSpinning(true);
 
@@ -365,28 +365,11 @@ export const Wheel: React.FC<Props> = ({
 
     const timeout = setTimeout(() => {
       setShowPopup(false);
-      if (timerEnabled) {
-        setTimerResetKey((key) => key + 1);
-        setTimerRunning(true);
-      }
+      onAnnouncementFinished();
     }, POPUP_VISIBLE_MS);
 
     return () => clearTimeout(timeout);
-  }, [showPopup, timerEnabled]);
-
-  const handleTimerRunningChange = useCallback((running: boolean) => {
-    setTimerRunning(running);
-  }, []);
-
-  const handleToggleTimer = () => {
-    setTimerEnabled((enabled) => {
-      if (enabled) {
-        // Timer wird abgeschaltet: laufende Zeit stoppen
-        setTimerRunning(false);
-      }
-      return !enabled;
-    });
-  };
+  }, [showPopup, onAnnouncementFinished]);
 
   return (
     <WheelContainer>
@@ -418,19 +401,10 @@ export const Wheel: React.FC<Props> = ({
         </CheckboxLabel>
 
         <CheckboxLabel>
-          <Checkbox checked={timerEnabled} onChange={handleToggleTimer} />
+          <Checkbox checked={timerEnabled} onChange={onToggleTimerEnabled} />
           Timer über 3 Minuten nach der Auswahl starten
         </CheckboxLabel>
       </OptionsContainer>
-
-      {timerEnabled && (
-        <Timer
-          durationSeconds={TIMER_DURATION_SECONDS}
-          running={timerRunning}
-          resetKey={timerResetKey}
-          onRunningChange={handleTimerRunningChange}
-        />
-      )}
 
       {allDone && (
         <>
