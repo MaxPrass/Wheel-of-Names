@@ -1,21 +1,39 @@
 import styled from 'styled-components';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Participants } from './Participants';
 import { Question } from './Question';
 import { Wheel } from './Wheel';
+import { Timer } from './Timer';
 import { Header } from './Header';
 import './App.css';
 
 const Main = styled.main`
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   gap: 2rem;
   padding: 2rem 1rem;
   flex-wrap: wrap;
 
   @media (max-width: 900px) {
     flex-direction: column;
+    align-items: center;
+  }
+`;
+
+const SideColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.5rem;
+  padding-top: 1rem;
+  min-width: 300px;
+  max-width: 360px;
+
+  @media (max-width: 900px) {
+    padding-top: 0;
+    max-width: 100%;
+    align-items: center;
   }
 `;
 
@@ -26,11 +44,16 @@ const ParticipantsWrapper = styled.div`
 `;
 
 export const MAX_PARTICIPANTS = 18;
+const TIMER_DURATION_SECONDS = 180; // 3 Minuten
 
 function App() {
   const [names, setNames] = useState<string[]>([]);
   const [drawn, setDrawn] = useState<string[]>([]);
   const [removeOnSpin, setRemoveOnSpin] = useState(true);
+
+  const [timerEnabled, setTimerEnabled] = useState(true);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerResetKey, setTimerResetKey] = useState(0);
 
   // Verbleibende Namen: alle Namen abzüglich der bereits gezogenen
   // (duplikatsicher, da jeder gezogene Eintrag nur einmal abgezogen wird)
@@ -80,19 +103,63 @@ function App() {
     setDrawn([]);
   };
 
+  /** Beim Drehen laufende Zeit abbrechen und zurücksetzen. */
+  const handleSpinStart = useCallback(() => {
+    setTimerRunning(false);
+    setTimerResetKey((key) => key + 1);
+  }, []);
+
+  /** Wird aufgerufen, sobald die Meldung „Du bist dran!“ verschwindet. */
+  const handleAnnouncementFinished = useCallback(() => {
+    setTimerEnabled((enabled) => {
+      if (enabled) {
+        setTimerResetKey((key) => key + 1);
+        setTimerRunning(true);
+      }
+      return enabled;
+    });
+  }, []);
+
+  const toggleTimerEnabled = () => {
+    setTimerEnabled((enabled) => {
+      if (enabled) {
+        setTimerRunning(false);
+      }
+      return !enabled;
+    });
+  };
+
+  const handleTimerRunningChange = useCallback((running: boolean) => {
+    setTimerRunning(running);
+  }, []);
+
   return (
     <>
       <Header />
       <Main>
-        <Question />
         <Wheel
           participants={remaining}
           onWinnerSelected={handleWinnerSelected}
           removeOnSpin={removeOnSpin}
           onToggleRemoveOnSpin={toggleRemoveOnSpin}
+          timerEnabled={timerEnabled}
+          onToggleTimerEnabled={toggleTimerEnabled}
+          onSpinStart={handleSpinStart}
+          onAnnouncementFinished={handleAnnouncementFinished}
           onResetRound={resetRound}
           allDone={remaining.length === 0 && names.length > 0}
         />
+        <SideColumn>
+          <Question />
+          {timerEnabled && (
+            <Timer
+              durationSeconds={TIMER_DURATION_SECONDS}
+              running={timerRunning}
+              resetKey={timerResetKey}
+              onRunningChange={handleTimerRunningChange}
+            />
+          )}
+        </SideColumn>
       </Main>
       <ParticipantsWrapper>
         <Participants
