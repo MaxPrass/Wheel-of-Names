@@ -1,38 +1,50 @@
 import styled from 'styled-components';
-import { Section, Button, Input } from './styles';
-import { FC, useState } from 'react';
-
+import { Section, Button, Input, colors } from './styles';
+import { FC, useState, KeyboardEvent } from 'react';
 import { MAX_PARTICIPANTS } from './App';
 import { capitalize } from './utils';
 
 const ListItemContainer = styled.div`
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
 `;
 
 const ListItem = styled.li`
-  width: 100%;
-  padding: 10px;
-  margin: 5px;
-  background-color: #f9f9f9;
-  border-radius: 5px;
+  flex: 1;
+  padding: 0.7rem 1rem;
+  margin: 0.3rem 0;
+  background-color: #ffffff;
+  border-radius: 6px;
   list-style: none;
-  color: #282c34;
-  font-weight: bold;
+  color: ${colors.kosmischesBlau};
+  font-weight: 600;
   font-size: 1rem;
+  text-align: left;
+`;
+
+const List = styled.ul`
+  padding: 0;
+  margin: 0;
 `;
 
 const ButtonGroup = styled.div`
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
-  & > button {
-    margin-left: 10px;
-  }
+  justify-content: center;
+  margin-bottom: 0.5rem;
+`;
+
+const SectionTitle = styled.h2`
+  color: ${colors.kosmischesBlau};
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
 `;
 
 const ErrorMessage = styled.p`
-  color: red;
+  color: ${colors.kirsche};
+  font-weight: 600;
+  margin: 0.3rem 0;
 `;
 
 interface ParticipantsProps {
@@ -57,12 +69,12 @@ export const Participants: FC<ParticipantsProps> = ({
   const hasParticipants = names.length > 0;
 
   const validateInput = (name: string) => {
-    const specialCharPattern = /[^a-zA-Z0-9 ]/;
+    const specialCharPattern = /[^a-zA-ZäöüÄÖÜß0-9 -]/;
     if (!name.trim()) {
-      return 'Name cannot be empty.';
+      return 'Bitte einen Namen eingeben.';
     }
     if (specialCharPattern.test(name)) {
-      return 'Name cannot contain special characters.';
+      return 'Der Name darf keine Sonderzeichen enthalten.';
     }
     return '';
   };
@@ -71,56 +83,59 @@ export const Participants: FC<ParticipantsProps> = ({
     const validationError = validateInput(participant);
     if (validationError) {
       setError(validationError);
-    } else {
-      handleAddName(participant);
-      setParticipant('');
-      setError('');
+      return;
     }
+    handleAddName(participant.trim());
+    setParticipant('');
+    setError('');
   };
 
   return (
     <Section>
-      <h2>Add Participants</h2>
+      <SectionTitle>Teilnehmende hinzufügen</SectionTitle>
       <Input
-        disabled={isMaxParticipantsReached}
         type="text"
-        placeholder="Enter a name"
+        placeholder="Name eingeben"
         value={participant}
         onChange={(e) => setParticipant(e.target.value)}
-        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+        onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
           if (e.key === 'Enter') {
             handleAddParticipant();
           }
         }}
       />
-      {error && <ErrorMessage>{error}</ErrorMessage>}
-
-      {isMaxParticipantsReached && (
-        <ErrorMessage>Max participants reached.</ErrorMessage>
-      )}
       <Button
-        disabled={isMaxParticipantsReached}
         onClick={handleAddParticipant}
+        disabled={isMaxParticipantsReached}
       >
-        Add
+        Hinzufügen
       </Button>
-      <h2>Participants</h2>
+
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+      {isMaxParticipantsReached && (
+        <ErrorMessage>
+          Maximale Anzahl an Teilnehmenden erreicht.
+        </ErrorMessage>
+      )}
+
+      <SectionTitle>Teilnehmende</SectionTitle>
       <ButtonGroup>
         <Button onClick={shuffleNames} disabled={!hasParticipants}>
-          Shuffle
+          Mischen
         </Button>
         <Button onClick={sortNames} disabled={!hasParticipants}>
-          Sort
+          Sortieren
         </Button>
       </ButtonGroup>
-      <ul>
+
+      <List>
         {names.map((name, index) => (
-          <ListItemContainer key={index}>
+          <ListItemContainer key={`${name}-${index}`}>
             <ListItem>{capitalize(name)}</ListItem>
-            <Button onClick={() => handleRemoveName(index)}>Del</Button>
+            <Button onClick={() => handleRemoveName(index)}>Entfernen</Button>
           </ListItemContainer>
         ))}
-      </ul>
+      </List>
     </Section>
   );
 };
