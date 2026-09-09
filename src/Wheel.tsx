@@ -1,9 +1,10 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import styled from 'styled-components';
 
 import { capitalize } from './utils';
-import { Button, colors } from './styles';
+import { Button, Checkbox, CheckboxLabel, colors } from './styles';
+import { Timer } from './Timer';
 
 const Popup = styled.div`
   position: fixed;
@@ -47,15 +48,12 @@ const ButtonsContainer = styled.div`
   flex-wrap: wrap;
 `;
 
-const OptionsRow = styled.label`
+const OptionsContainer = styled.div`
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  color: ${colors.kosmischesBlau};
-  font-size: 1rem;
-  cursor: pointer;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
 `;
 
 const AllDoneMessage = styled.p`
@@ -156,13 +154,16 @@ const buildSectorColors = (count: number) => {
   return result;
 };
 
-/* ---------- Geometrie ---------- */
+/* ---------- Geometrie & Timer ---------- */
 
 const CANVAS_WIDTH = 460;
 const CANVAS_HEIGHT = 420;
 const CENTER_X = 205;
 const CENTER_Y = CANVAS_HEIGHT / 2;
 const RADIUS = 196;
+
+const TIMER_DURATION_SECONDS = 180; // 3 Minuten
+const POPUP_VISIBLE_MS = 5000;
 
 export const Wheel: React.FC<Props> = ({
   participants,
@@ -179,6 +180,10 @@ export const Wheel: React.FC<Props> = ({
   >('clockwise');
   const [showPopup, setShowPopup] = useState(false);
   const [popupWinner, setPopupWinner] = useState<string | null>(null);
+
+  const [timerEnabled, setTimerEnabled] = useState(true);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerResetKey, setTimerResetKey] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const numSectors = participants.length;
@@ -292,6 +297,11 @@ export const Wheel: React.FC<Props> = ({
 
   const startSpin = () => {
     if (spinning || numSectors === 0) return;
+
+    // Laufenden Timer abbrechen und zurücksetzen
+    setTimerRunning(false);
+    setTimerResetKey((key) => key + 1);
+
     setSpinning(true);
 
     const numFullRotations = Math.random() * 5 + 5;
@@ -342,6 +352,7 @@ export const Wheel: React.FC<Props> = ({
     );
   };
 
+  // Konfetti zeigen, Popup ausblenden und danach den Timer starten
   useEffect(() => {
     if (!showPopup) return;
 
@@ -352,9 +363,30 @@ export const Wheel: React.FC<Props> = ({
       colors: [kosmischesBlau, minze, kirsche],
     });
 
-    const timer = setTimeout(() => setShowPopup(false), 5000);
-    return () => clearTimeout(timer);
-  }, [showPopup]);
+    const timeout = setTimeout(() => {
+      setShowPopup(false);
+      if (timerEnabled) {
+        setTimerResetKey((key) => key + 1);
+        setTimerRunning(true);
+      }
+    }, POPUP_VISIBLE_MS);
+
+    return () => clearTimeout(timeout);
+  }, [showPopup, timerEnabled]);
+
+  const handleTimerRunningChange = useCallback((running: boolean) => {
+    setTimerRunning(running);
+  }, []);
+
+  const handleToggleTimer = () => {
+    setTimerEnabled((enabled) => {
+      if (enabled) {
+        // Timer wird abgeschaltet: laufende Zeit stoppen
+        setTimerRunning(false);
+      }
+      return !enabled;
+    });
+  };
 
   return (
     <WheelContainer>
@@ -379,14 +411,26 @@ export const Wheel: React.FC<Props> = ({
         </Button>
       </ButtonsContainer>
 
-      <OptionsRow>
-        <input
-          type="checkbox"
-          checked={removeOnSpin}
-          onChange={onToggleRemoveOnSpin}
+      <OptionsContainer>
+        <CheckboxLabel>
+          <Checkbox checked={removeOnSpin} onChange={onToggleRemoveOnSpin} />
+          Ausgewählte Person aus dem Rad entfernen
+        </CheckboxLabel>
+
+        <CheckboxLabel>
+          <Checkbox checked={timerEnabled} onChange={handleToggleTimer} />
+          Timer über 3 Minuten nach der Auswahl starten
+        </CheckboxLabel>
+      </OptionsContainer>
+
+      {timerEnabled && (
+        <Timer
+          durationSeconds={TIMER_DURATION_SECONDS}
+          running={timerRunning}
+          resetKey={timerResetKey}
+          onRunningChange={handleTimerRunningChange}
         />
-        Ausgewählte Person aus dem Rad entfernen
-      </OptionsRow>
+      )}
 
       {allDone && (
         <>
