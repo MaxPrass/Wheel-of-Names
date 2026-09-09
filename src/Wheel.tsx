@@ -40,6 +40,7 @@ const ButtonsContainer = styled.div`
 
 interface Props {
   participants: string[];
+  onWinnerSelected?: (index: number) => void; // NEU
 }
 
 const colors = [
@@ -68,7 +69,7 @@ const colors = [
   '#CC294F', // Darker hot pink
 ];
 
-export const Wheel: React.FC<Props> = ({ participants }) => {
+export const Wheel: React.FC<Props> = ({ participants, onWinnerSelected }) => {
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [spinDirection, setSpinDirection] = useState<
@@ -81,7 +82,7 @@ export const Wheel: React.FC<Props> = ({ participants }) => {
   const numSectors = participants.length;
 
   useEffect(() => {
-    if (canvasRef.current) {
+    if (canvasRef.current && numSectors > 0) {
       drawWheel();
     }
   }, [participants, rotation]);
@@ -156,7 +157,7 @@ export const Wheel: React.FC<Props> = ({ participants }) => {
   };
 
   const startSpin = () => {
-    if (spinning) return;
+    if (spinning || numSectors === 0) return; // NEU: nicht drehen, wenn niemand mehr im Rad ist
     setSpinning(true);
 
     // Set the number of full rotations and calculate final rotation
@@ -205,6 +206,7 @@ export const Wheel: React.FC<Props> = ({ participants }) => {
 
     setPopupWinner(participants[winningSector]);
     setShowPopup(true);
+    onWinnerSelected?.(winningSector); // NEU: Gewinner-Index nach oben melden
   };
 
   const changeSpinDirection = () => {
