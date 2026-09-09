@@ -3,260 +3,306 @@ import confetti from 'canvas-confetti';
 import styled from 'styled-components';
 
 import { capitalize } from './utils';
-import { Button } from './styles';
+import { Button, colors } from './styles';
 
 const Popup = styled.div`
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: white;
-  color: #006400;
-  padding: 1rem 2rem;
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  text-align: center;
-  z-index: 1000;
-  animation: popin 1s ease-out;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #ffffff;
+  color: ${colors.kosmischesBlau};
+  padding: 1rem 2.5rem;
+  border-radius: 10px;
+  border: 3px solid ${colors.minze};
+  box-shadow: 0 8px 24px rgba(54, 52, 157, 0.35);
+  text-align: center;
+  z-index: 1000;
+  animation: popin 0.6s ease-out;
 
-  @keyframes popin {
-    0% {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(0.5);
-    }
-    100% {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-    }
-  }
+  @keyframes popin {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.5);
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+`;
+
+const WheelContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
 `;
 
 const ButtonsContainer = styled.div`
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+`;
+
+const OptionsRow = styled.label`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  color: ${colors.kosmischesBlau};
+  font-size: 1rem;
+  cursor: pointer;
+`;
+
+const AllDoneMessage = styled.p`
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: ${colors.kirsche};
+  margin: 1rem 0 0;
+`;
+
+const EmptyHint = styled.p`
+  color: ${colors.kosmischesBlau};
+  font-size: 1rem;
+  margin: 1rem 0 0;
 `;
 
 interface Props {
-  participants: string[];
+  participants: string[];
+  onWinnerSelected: (index: number) => void;
+  removeOnSpin: boolean;
+  onToggleRemoveOnSpin: () => void;
+  onResetRound: () => void;
+  allDone: boolean;
 }
 
-const colors = [
-  '#CC4629', // Darker vibrant orange
-  '#CC9A29', // Darker bright yellow
-  '#B2CC29', // Darker light green-yellow
-  '#5ECC29', // Darker bright green
-  '#29CC46', // Darker bright teal-green
-  '#29CC99', // Darker turquoise
-  '#2985CC', // Darker sky blue
-  '#293FCC', // Darker bright blue
-  '#4629CC', // Darker purple
-  '#9929CC', // Darker violet
-  '#CC2981', // Darker hot pink
-  '#CC2929', // Darker red
-  '#CC5929', // Darker coral
-  '#CC9529', // Darker gold
-  '#B2CC29', // Darker lime green
-  '#66CC29', // Darker olive green
-  '#29CC5F', // Darker mint green
-  '#29CC91', // Darker pale turquoise
-  '#298ECC', // Darker deep sky blue
-  '#4A29CC', // Darker royal blue
-  '#8429CC', // Darker medium purple
-  '#CC298F', // Darker fuchsia
-  '#CC294F', // Darker hot pink
+const palette = [
+  { bg: colors.kosmischesBlau, text: '#FFFFFF' },
+  { bg: colors.minze, text: '#0F2E22' },
+  { bg: colors.kirsche, text: '#FFFFFF' },
+  { bg: colors.lavendelgrau, text: colors.kosmischesBlau },
 ];
 
-export const Wheel: React.FC<Props> = ({ participants }) => {
-  const [spinning, setSpinning] = useState(false);
-  const [rotation, setRotation] = useState(0);
-  const [spinDirection, setSpinDirection] = useState<
-    'clockwise' | 'counterclockwise'
-  >('clockwise');
-  const [showPopup, setShowPopup] = useState(false);
-  const [popupWinner, setPopupWinner] = useState<string | null>(null);
+export const Wheel: React.FC<Props> = ({
+  participants,
+  onWinnerSelected,
+  removeOnSpin,
+  onToggleRemoveOnSpin,
+  onResetRound,
+  allDone,
+}) => {
+  const [spinning, setSpinning] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [spinDirection, setSpinDirection] = useState<
+    'clockwise' | 'counterclockwise'
+  >('clockwise');
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupWinner, setPopupWinner] = useState<string | null>(null);
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const numSectors = participants.length;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const numSectors = participants.length;
 
-  useEffect(() => {
-    if (canvasRef.current) {
-      drawWheel();
-    }
-  }, [participants, rotation]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  const darkenColor = (color: string, amount: number): string => {
-    let r = parseInt(color.slice(1, 3), 16);
-    let g = parseInt(color.slice(3, 5), 16);
-    let b = parseInt(color.slice(5, 7), 16);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    r = Math.max(0, r - amount);
-    g = Math.max(0, g - amount);
-    b = Math.max(0, b - amount);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
-  };
+    if (numSectors === 0) {
+      ctx.save();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
 
-  const drawWheel = () => {
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext('2d')!;
-    const radius = canvas.width / 2;
-    const sliceAngle = (2 * Math.PI) / numSectors;
+    drawWheel(ctx, canvas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participants, rotation]);
 
-    // Clear previous drawing
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.translate(radius, radius);
-    ctx.rotate(-rotation * (Math.PI / 180));
+  const drawWheel = (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+  ) => {
+    const radius = canvas.width / 2;
+    const sliceAngle = (2 * Math.PI) / numSectors;
 
-    // Draw sectors
-    for (let i = 0; i < numSectors; i++) {
-      const startAngle = i * sliceAngle;
-      const endAngle = (i + 1) * sliceAngle;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, radius, startAngle, endAngle);
-      ctx.closePath();
-      const color = darkenColor(colors[i % colors.length], 30);
-      ctx.fillStyle = color;
-      ctx.fill();
+    ctx.save();
+    ctx.translate(radius, radius);
+    ctx.rotate(-rotation * (Math.PI / 180));
 
-      // Draw the name in the sector
-      ctx.save();
-      ctx.rotate((startAngle + endAngle) / 2);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = 'white';
-      ctx.font = '16px Arial';
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      ctx.shadowBlur = 3;
-      ctx.fillText(capitalize(participants[i]) || '', radius * 0.5, 0);
-      ctx.restore();
-    }
+    for (let i = 0; i < numSectors; i++) {
+      const startAngle = i * sliceAngle;
+      const endAngle = (i + 1) * sliceAngle;
+      const sector = palette[i % palette.length];
 
-    ctx.rotate(rotation * (Math.PI / 180)); // Reset rotation
-    ctx.translate(-radius, -radius);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, radius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = sector.bg;
+      ctx.fill();
 
-    // Draw the static indicator
-    const indicatorLength = 20;
-    const indicatorWidth = 10;
-    ctx.save();
-    ctx.translate(canvas.width, canvas.height / 2);
-    ctx.beginPath();
-    ctx.moveTo(-indicatorLength, -indicatorWidth / 2);
-    ctx.lineTo(0, -indicatorWidth / 2);
-    ctx.lineTo(0, indicatorWidth / 2);
-    ctx.lineTo(-indicatorLength, indicatorWidth / 2);
-    ctx.closePath();
-    ctx.fillStyle = 'red';
-    ctx.fill();
-    ctx.restore();
-  };
+      ctx.save();
+      ctx.rotate((startAngle + endAngle) / 2);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = sector.text;
+      ctx.font = '600 16px "Open Sans", Arial, sans-serif';
+      ctx.fillText(capitalize(participants[i]) || '', radius * 0.55, 0);
+      ctx.restore();
+    }
 
-  const startSpin = () => {
-    if (spinning) return;
-    setSpinning(true);
+    ctx.restore();
 
-    // Set the number of full rotations and calculate final rotation
-    const numFullRotations = Math.random() * 5 + 5; // Between 5 and 10 full rotations
-    const totalRotation = numFullRotations * 360;
-    const finalRotation =
-      (rotation +
-        (spinDirection === 'clockwise' ? -totalRotation : totalRotation)) %
-      360;
+    // Statischer Zeiger am rechten Rand
+    const indicatorLength = 22;
+    const indicatorWidth = 12;
+    ctx.save();
+    ctx.translate(canvas.width, canvas.height / 2);
+    ctx.beginPath();
+    ctx.moveTo(-indicatorLength, -indicatorWidth / 2);
+    ctx.lineTo(0, -indicatorWidth / 2);
+    ctx.lineTo(0, indicatorWidth / 2);
+    ctx.lineTo(-indicatorLength, indicatorWidth / 2);
+    ctx.closePath();
+    ctx.fillStyle = colors.kirsche;
+    ctx.fill();
+    ctx.restore();
+  };
 
-    const spinDuration = 6000;
-    const easing = (t: number) => {
-      // Ease-out cubic
-      return 1 - Math.pow(1 - t, 3);
-    };
+  const startSpin = () => {
+    if (spinning || numSectors === 0) return;
+    setSpinning(true);
 
-    let startTime: number;
+    const numFullRotations = Math.random() * 5 + 5;
+    const totalRotation = numFullRotations * 360;
+    const direction = spinDirection === 'clockwise' ? -1 : 1;
+    const finalRotation = (rotation + direction * totalRotation) % 360;
 
-    const animate = (time: number) => {
-      if (!startTime) startTime = time;
-      const elapsed = time - startTime;
-      const t = Math.min(elapsed / spinDuration, 1);
-      const easeT = easing(t);
-      const currentRotation =
-        rotation +
-        (spinDirection === 'clockwise' ? -totalRotation : totalRotation) *
-          easeT;
+    const spinDuration = 6000;
+    const easing = (t: number) => 1 - Math.pow(1 - t, 3);
 
-      setRotation(currentRotation);
+    let startTime: number | undefined;
 
-      if (elapsed < spinDuration) {
-        requestAnimationFrame(animate);
-      } else {
-        setSpinning(false);
-        determineWinner(finalRotation);
-      }
-    };
+    const animate = (time: number) => {
+      if (startTime === undefined) startTime = time;
+      const elapsed = time - startTime;
+      const t = Math.min(elapsed / spinDuration, 1);
+      const currentRotation = rotation + direction * totalRotation * easing(t);
 
-    requestAnimationFrame(animate);
-  };
+      setRotation(currentRotation);
 
-  const determineWinner = (finalRotation: number) => {
-    const sliceAngle = 360 / numSectors;
-    const normalizedRotation = ((finalRotation % 360) + 360) % 360;
-    const winningSector = Math.floor(normalizedRotation / sliceAngle);
+      if (elapsed < spinDuration) {
+        requestAnimationFrame(animate);
+      } else {
+        setSpinning(false);
+        determineWinner(finalRotation);
+      }
+    };
 
-    setPopupWinner(participants[winningSector]);
-    setShowPopup(true);
-  };
+    requestAnimationFrame(animate);
+  };
 
-  const changeSpinDirection = () => {
-    setSpinDirection(
-      spinDirection === 'clockwise' ? 'counterclockwise' : 'clockwise',
-    );
-  };
+  const determineWinner = (finalRotation: number) => {
+    const sliceAngle = 360 / numSectors;
+    const normalizedRotation = ((finalRotation % 360) + 360) % 360;
+    const winningSector = Math.min(
+      Math.floor(normalizedRotation / sliceAngle),
+      numSectors - 1,
+    );
 
-  useEffect(() => {
-    if (showPopup) {
-      startConfetti();
-      const timer = setTimeout(() => setShowPopup(false), 5000); // Hide popup after 5 seconds
-      return () => clearTimeout(timer);
-    }
-  }, [showPopup]);
+    setPopupWinner(participants[winningSector]);
+    setShowPopup(true);
+    onWinnerSelected(winningSector);
+  };
 
-  const startConfetti = () => {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-  };
+  const changeSpinDirection = () => {
+    setSpinDirection(
+      spinDirection === 'clockwise' ? 'counterclockwise' : 'clockwise',
+    );
+  };
 
-  return (
-    <div>
-      <canvas
-        ref={canvasRef}
-        width={400}
-        height={400}
-        style={{ borderRadius: '50%', border: '2px solid black' }}
-      />
-      <ButtonsContainer>
-        <Button
-          onClick={changeSpinDirection}
-          disabled={participants.length === 0 || spinning}
-        >
-          {capitalize(spinDirection)}
-        </Button>
-        <Button
-          onClick={startSpin}
-          disabled={participants.length === 0 || spinning}
-        >
-          Spin
-        </Button>
-      </ButtonsContainer>
-      {showPopup && popupWinner && (
-        <Popup>
-          <h2>Congratulations!</h2>
-          <h3>{capitalize(popupWinner)}</h3>
-        </Popup>
-      )}
-    </div>
+  useEffect(() => {
+    if (!showPopup) return;
+
+    confetti({
+      particleCount: 120,
+      spread: 75,
+      origin: { y: 0.6 },
+      colors: [colors.kosmischesBlau, colors.minze, colors.kirsche],
+    });
+
+    const timer = setTimeout(() => setShowPopup(false), 5000);
+    return () => clearTimeout(timer);
+  }, [showPopup]);
+
+  return (
+    <WheelContainer>
+      <canvas
+        ref={canvasRef}
+        width={400}
+        height={400}
+        style={{
+          borderRadius: '50%',
+          border: `3px solid ${colors.kosmischesBlau}`,
+          maxWidth: '100%',
+          height: 'auto',
+        }}
+      />
+
+      <ButtonsContainer>
+        <Button
+          onClick={changeSpinDirection}
+          disabled={numSectors === 0 || spinning}
+        >
+          {spinDirection === 'clockwise'
+            ? 'Im Uhrzeigersinn'
+            : 'Gegen den Uhrzeigersinn'}
+        </Button>
+        <Button onClick={startSpin} disabled={numSectors === 0 || spinning}>
+          Drehen
+        </Button>
+      </ButtonsContainer>
+
+      <OptionsRow>
+        <input
+          type="checkbox"
+          checked={removeOnSpin}
+          onChange={onToggleRemoveOnSpin}
+        />
+        Ausgewählte Person aus dem Rad entfernen
+      </OptionsRow>
+
+      {allDone && (
+        <>
+          <AllDoneMessage>Alle waren dran!</AllDoneMessage>
+          <ButtonsContainer>
+            <Button onClick={onResetRound}>Neue Runde starten</Button>
+          </ButtonsContainer>
+        </>
+      )}
+
+      {!allDone && numSectors === 0 && (
+        <EmptyHint>Bitte unten Teilnehmende hinzufügen.</EmptyHint>
+      )}
+
+      {showPopup && popupWinner && (
+        <Popup>
+          <h2>Du bist dran!</h2>
+          <h3>{capitalize(popupWinner)}</h3>
+        </Popup>
+      )}
+    </WheelContainer>
   );
 };
