@@ -81,12 +81,88 @@ interface Props {
   allDone: boolean;
 }
 
-const palette = [
-  { bg: colors.kosmischesBlau, text: '#FFFFFF' },
-  { bg: colors.minze, text: '#0F2E22' },
-  { bg: colors.kirsche, text: '#FFFFFF' },
-  { bg: colors.lavendelgrau, text: colors.kosmischesBlau },
+/* ---------- Farblogik ---------- */
+
+const hexToRgb = (hex: string) => ({
+  r: parseInt(hex.slice(1, 3), 16),
+  g: parseInt(hex.slice(3, 5), 16),
+  b: parseInt(hex.slice(5, 7), 16),
+});
+
+const toHex = (value: number) =>
+  Math.round(Math.min(255, Math.max(0, value)))
+    .toString(16)
+    .padStart(2, '0');
+
+/** Mischt zwei Markenfarben im angegebenen Verhältnis. */
+const mix = (hexA: string, hexB: string, ratio = 0.5) => {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  const r = a.r + (b.r - a.r) * ratio;
+  const g = a.g + (b.g - a.g) * ratio;
+  const bl = a.b + (b.b - a.b) * ratio;
+  return `#${toHex(r)}${toHex(g)}${toHex(bl)}`;
+};
+
+/** Wählt Schwarz oder Weiß je nach Helligkeit des Untergrunds. */
+const textColorFor = (hex: string) => {
+  const { r, g, b } = hexToRgb(hex);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#12123A' : '#FFFFFF';
+};
+
+const { kosmischesBlau, minze, kirsche, lavendelgrau } = colors;
+
+/**
+ * Reihenfolge bewusst so gesetzt, dass sich benachbarte Sektoren
+ * in Helligkeit UND Farbton unterscheiden: kräftig, hell, kräftig, hell ...
+ */
+const wheelPalette = [
+  kosmischesBlau,
+  minze,
+  kirsche,
+  lavendelgrau,
+  mix(kosmischesBlau, kirsche), // Aubergine
+  mix(minze, lavendelgrau), // Pastellminze
+  mix(kirsche, lavendelgrau, 0.45), // Altrosa
+  mix(kosmischesBlau, minze), // Petrol
+  mix(kirsche, minze, 0.35), // Koralle
+  mix(kosmischesBlau, lavendelgrau, 0.6), // Taubenblau
 ];
+
+/**
+ * Weist jedem Sektor eine Farbe zu und stellt sicher, dass weder
+ * direkte Nachbarn noch der letzte und erste Sektor gleich sind.
+ */
+const buildSectorColors = (count: number) => {
+  const result: string[] = [];
+
+  for (let i = 0; i < count; i++) {
+    let color = wheelPalette[i % wheelPalette.length];
+    const previous = result[i - 1];
+    const isLast = i === count - 1;
+
+    if (color === previous || (isLast && color === result[0])) {
+      const alternative = wheelPalette.find(
+        (candidate) =>
+          candidate !== previous && !(isLast && candidate === result[0]),
+      );
+      if (alternative) color = alternative;
+    }
+
+    result.push(color);
+  }
+
+  return result;
+};
+
+/* ---------- Geometrie ---------- */
+
+const CANVAS_WIDTH = 460;
+const CANVAS_HEIGHT = 420;
+const CENTER_X = 205;
+const CENTER_Y = CANVAS_HEIGHT / 2;
+const RADIUS = 196;
 
 export const Wheel: React.FC<Props> = ({
   participants,
@@ -117,67 +193,100 @@ export const Wheel: React.FC<Props> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (numSectors === 0) {
-      ctx.save();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      return;
+      drawEmptyWheel(ctx);
+    } else {
+      drawSectors(ctx);
     }
 
-    drawWheel(ctx, canvas);
+    drawPointer(ctx);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participants, rotation]);
 
-  const drawWheel = (
-    ctx: CanvasRenderingContext2D,
-    canvas: HTMLCanvasElement,
-  ) => {
-    const radius = canvas.width / 2;
+  const drawEmptyWheel = (ctx: CanvasRenderingContext2D) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(CENTER_X, CENTER_Y, RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = kosmischesBlau;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const drawSectors = (ctx: CanvasRenderingContext2D) => {
     const sliceAngle = (2 * Math.PI) / numSectors;
+    const sectorColors = buildSectorColors(numSectors);
 
     ctx.save();
-    ctx.translate(radius, radius);
+    ctx.translate(CENTER_X, CENTER_Y);
     ctx.rotate(-rotation * (Math.PI / 180));
 
     for (let i = 0; i < numSectors; i++) {
       const startAngle = i * sliceAngle;
       const endAngle = (i + 1) * sliceAngle;
-      const sector = palette[i % palette.length];
+      const background = sectorColors[i];
 
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, radius, startAngle, endAngle);
+      ctx.arc(0, 0, RADIUS, startAngle, endAngle);
       ctx.closePath();
-      ctx.fillStyle = sector.bg;
+      ctx.fillStyle = background;
       ctx.fill();
+
+      // Feine Trennlinie, damit Sektorgrenzen immer sichtbar bleiben
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.stroke();
 
       ctx.save();
       ctx.rotate((startAngle + endAngle) / 2);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = sector.text;
+      ctx.fillStyle = textColorFor(background);
       ctx.font = '600 16px "Open Sans", Arial, sans-serif';
-      ctx.fillText(capitalize(participants[i]) || '', radius * 0.55, 0);
+      ctx.fillText(capitalize(participants[i]) || '', RADIUS * 0.55, 0);
       ctx.restore();
     }
 
     ctx.restore();
 
-    // Statischer Zeiger am rechten Rand
-    const indicatorLength = 22;
-    const indicatorWidth = 12;
+    // Außenring
     ctx.save();
-    ctx.translate(canvas.width, canvas.height / 2);
     ctx.beginPath();
-    ctx.moveTo(-indicatorLength, -indicatorWidth / 2);
-    ctx.lineTo(0, -indicatorWidth / 2);
-    ctx.lineTo(0, indicatorWidth / 2);
-    ctx.lineTo(-indicatorLength, indicatorWidth / 2);
+    ctx.arc(CENTER_X, CENTER_Y, RADIUS, 0, Math.PI * 2);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = kosmischesBlau;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  /** Dreieckiger Zeiger am rechten Rand, Spitze nach innen, mit weißem Rand. */
+  const drawPointer = (ctx: CanvasRenderingContext2D) => {
+    const tipX = CENTER_X + RADIUS - 14;
+    const baseX = CENTER_X + RADIUS + 26;
+    const halfHeight = 17;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(tipX, CENTER_Y);
+    ctx.lineTo(baseX, CENTER_Y - halfHeight);
+    ctx.lineTo(baseX, CENTER_Y + halfHeight);
     ctx.closePath();
-    ctx.fillStyle = colors.kirsche;
+
+    ctx.shadowColor = 'rgba(18, 18, 58, 0.35)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 1;
+    ctx.fillStyle = kirsche;
     ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.stroke();
     ctx.restore();
   };
 
@@ -240,7 +349,7 @@ export const Wheel: React.FC<Props> = ({
       particleCount: 120,
       spread: 75,
       origin: { y: 0.6 },
-      colors: [colors.kosmischesBlau, colors.minze, colors.kirsche],
+      colors: [kosmischesBlau, minze, kirsche],
     });
 
     const timer = setTimeout(() => setShowPopup(false), 5000);
@@ -251,14 +360,9 @@ export const Wheel: React.FC<Props> = ({
     <WheelContainer>
       <canvas
         ref={canvasRef}
-        width={400}
-        height={400}
-        style={{
-          borderRadius: '50%',
-          border: `3px solid ${colors.kosmischesBlau}`,
-          maxWidth: '100%',
-          height: 'auto',
-        }}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        style={{ maxWidth: '100%', height: 'auto' }}
       />
 
       <ButtonsContainer>
