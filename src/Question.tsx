@@ -19,6 +19,13 @@ const QuestionsContainer = styled.div`
   }
 `;
 
+const QuestionsTitle = styled.h2`
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: ${colors.kosmischesBlau};
+  margin: 0;
+`;
+
 const QuestionLine = styled.p`
   font-size: 1.25rem;
   font-weight: 600;
@@ -28,6 +35,7 @@ const QuestionLine = styled.p`
 
 export const Question: FC = () => (
   <QuestionsContainer>
+    <QuestionsTitle>Standup</QuestionsTitle>
     <QuestionLine>1. Was habe ich seit Montag gemacht?</QuestionLine>
     <QuestionLine>2. Was werde ich bis Freitag tun?</QuestionLine>
     <QuestionLine>3. Was hält mich auf?</QuestionLine>
