@@ -1,19 +1,25 @@
 import { FC } from 'react';
 import styled from 'styled-components';
+import { colors } from './styles';
 
 const HeaderContainer = styled.header`
-  background-color: #282c34;
-  min-height: 10vh;
+  background-color: ${colors.kosmischesBlau};
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  padding: 1.5rem 1rem;
+  text-align: center;
+`;
+
+const Title = styled.h1`
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  font-weight: 700;
 `;
 
 export const Header: FC = () => (
   <HeaderContainer>
-    <h1>Wheel of Names</h1>
+    <Title>Namensrad des „Souveränen Arbeitsplatz“</Title>
   </HeaderContainer>
 );
