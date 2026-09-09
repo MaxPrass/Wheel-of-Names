@@ -137,6 +137,17 @@ function App() {
     <>
       <Header />
       <Main>
+        <SideColumn>
+          <Question />
+          {timerEnabled && (
+            <Timer
+              durationSeconds={TIMER_DURATION_SECONDS}
+              running={timerRunning}
+              resetKey={timerResetKey}
+              onRunningChange={handleTimerRunningChange}
+            />
+          )}
+        </SideColumn>
         <Wheel
           participants={remaining}
           onWinnerSelected={handleWinnerSelected}
@@ -149,17 +160,6 @@ function App() {
           onResetRound={resetRound}
           allDone={remaining.length === 0 && names.length > 0}
         />
-        <SideColumn>
-          <Question />
-          {timerEnabled && (
-            <Timer
-              durationSeconds={TIMER_DURATION_SECONDS}
-              running={timerRunning}
-              resetKey={timerResetKey}
-              onRunningChange={handleTimerRunningChange}
-            />
-          )}
-        </SideColumn>
       </Main>
       <ParticipantsWrapper>
         <Participants
